@@ -18,6 +18,7 @@ object WebCrawler {
 class WebCrawler extends Actor with ActorLogging{
 
   var requestedCrawlActor: ActorRef = null
+  var client: ActorRef = null
 
 
   override def receive: Receive = {
@@ -25,9 +26,11 @@ class WebCrawler extends Actor with ActorLogging{
       if (requestedCrawlActor == null) {
         requestedCrawlActor = context.actorOf(Props[URLValidator](new URLValidator(url, depth)))
       }
+      client = sender
 
     case Result(url, links) =>
       context.stop(requestedCrawlActor)
-      requestedCrawlActor ! CrawlResponse(url, links)
+      client ! CrawlResponse(url, links)
   }
+
 }

@@ -20,7 +20,7 @@ object DBOperation{
   */
 class DBOperation(jsonString: String) extends Actor with ActorLogging{
 
-  val dbName = "chat_transcripts"
+  val dbName = "TeamTable"
 
   self ! SaveToCloudantDatabase(jsonString)
 

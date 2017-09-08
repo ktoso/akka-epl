@@ -35,13 +35,19 @@ class HTMLParser(url: String, depth: Int) extends Actor with ActorLogging{
   import scala.collection.JavaConverters._
 
   val currentHost = new URL(url).getHost
+
   val isFixtures = url.endsWith("fixtures")
   val isTables = url.endsWith("tables")
   val isResults = url.endsWith("results")
 
+//  println("isFixtures:: ",isFixtures)
+//  println("isTables:: ",isTables)
+//  println("isResults:: ",isResults)
+
+
   WebHttpClient.get(url) onComplete {
-    case Success(fixturesBody) if isFixtures => self ! fixturesBody
     case Success(resultsBody) if isResults => self ! resultsBody
+    case Success(fixturesBody) if isFixtures => self ! fixturesBody
     case Success(tablesBody) if isTables => self ! tablesBody
     case Success(body) => self ! body
     case Failure(err) => self ! Status.Failure(err)
@@ -56,17 +62,18 @@ class HTMLParser(url: String, depth: Int) extends Actor with ActorLogging{
       getValidLinks(body)
         .filter(link => link != null && link.length > 0)
         .filter(link => !link.contains("mailto"))
+        .filter(link => !link.equals(url))
         .filter(link =>  currentHost  == new URL(link).getHost)
-        .filter(link => !(currentHost == link))
-        .filter(link => isFixtures || isResults || isTables)
+        //.filter(link => (link.endsWith("fixtures") || link.endsWith("tables") || link.endsWith("results")))
+        .filter(link => (link.endsWith("tables")))
         .foreach(context.parent ! ValidateUrl(_, depth))
 
       stop()
 
-    case resultsBody: String =>
-      val jsonStr = getTablesAndConvertToJson(resultsBody)
-      val dbActor = context.actorOf(Props[DBOperation](new DBOperation(jsonStr)))
-      dbActor ! getResultsAndConvertToJson(resultsBody)
+    case tablesBody: String =>
+      val jsonStr = getTablesAndConvertToJson(tablesBody)
+     // val dbActor = context.actorOf(Props[DBOperation](new DBOperation(jsonStr)))
+     // dbActor ! getResultsAndConvertToJson(tablesBody)
 
       stop()
 
@@ -74,8 +81,8 @@ class HTMLParser(url: String, depth: Int) extends Actor with ActorLogging{
       getFixturesAndConvertToJson(fixturesBody)
       stop()
 
-    case tablesBody: String =>
-      getTablesAndConvertToJson(tablesBody)
+    case resultsBody: String =>
+      getTablesAndConvertToJson(resultsBody)
       stop()
 
 
