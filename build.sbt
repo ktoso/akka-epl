@@ -20,3 +20,8 @@ libraryDependencies += "com.typesafe.play" % "play-json_2.12" % "2.6.3"
 
 libraryDependencies += "com.cloudant" % "cloudant-client" % "2.6.2"
 
+libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3"
+
+libraryDependencies += "com.typesafe.akka" % "akka-slf4j_2.12" % "2.5.4"
+
+
