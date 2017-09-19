@@ -2,36 +2,40 @@ package com.epl.akka
 
 import java.net.URL
 
-import akka.actor.{Actor, ActorLogging, Status}
+import akka.actor.{ Actor, ActorLogging, Props, Status }
 import com.epl.akka.HTMLParser._
-import com.epl.akka.URLValidator.ValidateUrl
+import com.epl.akka.VisitedURLFilter.ValidateUrl
 import org.jsoup.Jsoup
 import play.api.libs.json.Json
 
-import scala.util.{Failure, Success}
+import scala.util.{ Failure, Success }
 
 
 object HTMLParser {
 
-  case class Done() {}
+  def props(url: String, depth: Int) =
+    Props(new HTMLParser(url, depth))
 
-  case class Abort() {}
+  final case class Done()
 
-  case class GetFixturesAndConvertToJson(fixturesBody: String) {}
+  final case class Abort()
 
-  case class GetResultsAndConvertToJson(resultsBody: String) {}
+  final case class GetFixturesAndConvertToJson(fixturesBody: String)
 
-  case class GetTablesAndConvertToJson(tablesBody: String) {}
+  final case class GetResultsAndConvertToJson(resultsBody: String)
+
+  final case class GetTablesAndConvertToJson(tablesBody: String)
 
 }
 
 
 /**
-  * Created by sanjeevghimire on 9/1/17.
-  */
+ * Created by sanjeevghimire on 9/1/17.
+ */
 class HTMLParser(url: String, depth: Int) extends Actor with ActorLogging {
 
   implicit val ec = context.dispatcher
+
   import scala.collection.JavaConverters._
 
   val currentHost = new URL(url).getHost
@@ -40,7 +44,7 @@ class HTMLParser(url: String, depth: Int) extends Actor with ActorLogging {
   val isTables = url.endsWith("tables")
   val isResults = url.endsWith("results")
 
-  println("is Table:: "+isTables)
+  log.info("is Table:: " + isTables)
 
   WebHttpClient.get(url) onComplete {
     case Success(body) if isResults => self ! GetResultsAndConvertToJson(body)
@@ -59,58 +63,55 @@ class HTMLParser(url: String, depth: Int) extends Actor with ActorLogging {
     context.stop(self)
   }
 
-  def getFixturesAndConvertToJson(fixturesBody: String): String ={
-    return null
+  def getFixturesAndConvertToJson(fixturesBody: String): String = {
+    ??? // TODO not done yet
   }
 
-  def getTablesAndConvertToJson(tablesBody: String): String ={
+  def getTablesAndConvertToJson(tablesBody: String): String = {
     // name of the array in the JSON
-    val arrayName:String = "teams"
+    val arrayName: String = "teams"
 
-    val headings: List[String] = List("Position","teamLongName","teamShortName","Played","Won", "Drawn", "Lost","GF","GA","GD", "Points");
+    val headings: List[String] = List("Position", "teamLongName", "teamShortName", "Played", "Won", "Drawn", "Lost", "GF", "GA", "GD", "Points");
 
     var i = 0
 
-    val plTable = scala.collection.mutable.Map[String, scala.collection.mutable.Map[String, String]]()
+    var plTable = Map[String, scala.collection.mutable.Map[String, String]]()
 
     Jsoup.parse(tablesBody, this.url)
       .select("tbody.tableBodyContainer").first()
       .select("tr").asScala
-        .foreach(trElement => {
-          val teamName = trElement.attr("data-filtered-table-row-name")
-          val teamStats = scala.collection.mutable.Map[String, String]()
-          plTable += teamName -> teamStats
-          trElement.select("td").asScala
-            .foreach(tdElement => {
-              if (!tdElement.is("revealMore") && !tdElement.is("expandable") &&  !tdElement.is("form hideMed")) {
-                if (tdElement.is("value")) {
-                  teamStats+=(headings(i) -> tdElement.text())
-                } else if (tdElement.is("team")) {
-                  i+=1
-                  teamStats+=(headings(i) -> tdElement.select("a").select("span.long").text())
-                  i+=1
-                  teamStats+= (headings(i) -> tdElement.select("a").select("span.short").text())
-                }else{
-                  i+=1
-                  teamStats+=(headings(i) -> tdElement.text())
-                }
+      .foreach(trElement => {
+        val teamName = trElement.attr("data-filtered-table-row-name")
+        val teamStats = scala.collection.mutable.Map[String, String]()
+        plTable += teamName -> teamStats
+        trElement.select("td").asScala
+          .foreach(tdElement => {
+            if (!tdElement.is("revealMore") && !tdElement.is("expandable") && !tdElement.is("form hideMed")) {
+              if (tdElement.is("value")) {
+                teamStats += (headings(i) -> tdElement.text())
+              } else if (tdElement.is("team")) {
+                i += 1
+                teamStats += (headings(i) -> tdElement.select("a").select("span.long").text())
+                i += 1
+                teamStats += (headings(i) -> tdElement.select("a").select("span.short").text())
+              } else {
+                i += 1
+                teamStats += (headings(i) -> tdElement.text())
               }
             }
-            )
           }
-        )
+          )
+      }
+      )
 
 
-    val jsonString:String = Json.stringify(Json.toJson(plTable))
-
+    val jsonString: String = Json.stringify(Json.toJson(plTable))
     println(jsonString)
-
-
-    return jsonString
+    jsonString
   }
 
-  def getResultsAndConvertToJson(resultsBody: String): String ={
-    return null
+  def getResultsAndConvertToJson(resultsBody: String): String = {
+    ??? // TODO not implemented yet?
   }
 
   override def receive = {
@@ -119,7 +120,7 @@ class HTMLParser(url: String, depth: Int) extends Actor with ActorLogging {
         .filter(link => link != null && link.length > 0)
         .filter(link => !link.contains("mailto"))
         .filter(link => !link.equals(url))
-        .filter(link =>  currentHost  == new URL(link).getHost)
+        .filter(link => currentHost == new URL(link).getHost)
         //.filter(link => (link.endsWith("fixtures") || link.endsWith("tables") || link.endsWith("results")))
         .filter(link => (link.endsWith("tables")))
         .foreach(context.parent ! ValidateUrl(_, depth))

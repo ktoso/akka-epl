@@ -22,6 +22,8 @@ object WebHttpClient {
 
   def get(url: String): Future[String] = {
     val promise = Promise[String]()
+
+    // TODO why not use Akka-HTTP? 
     val request = client.prepareGet(url).build()
     client.executeRequest(request, new AsyncCompletionHandler[Response]() {
       override def onCompleted(response: Response): Response = {
